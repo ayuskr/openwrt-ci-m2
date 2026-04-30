@@ -22,38 +22,21 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-    - name: Initialization Environment(初始化环境)
-   env:
-    DEBIAN_FRONTEND: noninteractive
-  run: |
-    echo "🔧 初始化编译环境..."
 
-    # 官方初始化脚本（核心）
-    sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+    - name: Initialization Environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+        sudo -E apt -yqq update
+        sudo -E apt -yqq install dos2unix libfuse-dev python3 python3-pip python3-setuptools python3-venv
+        sudo -E apt -yqq autoremove --purge
+        sudo -E apt -yqq autoclean
+        sudo -E apt -yqq clean
+        sudo -E systemctl daemon-reexec
+        sudo -E systemctl daemon-reload
+        sudo timedatectl set-timezone "$TZ"
 
-    # 补充必要依赖（避免缺包）
-    sudo -E apt -yqq update
-    sudo -E apt -yqq install \
-      dos2unix \
-      libfuse-dev \
-      python3 \
-      python3-pip \
-      python3-setuptools \
-      python3-venv
-
-    # 清理系统（释放空间）
-    sudo -E apt -yqq autoremove --purge
-    sudo -E apt -yqq autoclean
-    sudo -E apt -yqq clean
-
-    # 刷新服务
-    sudo -E systemctl daemon-reexec
-    sudo -E systemctl daemon-reload
-
-    # 设置时区
-    sudo timedatectl set-timezone "$TZ"
-
-    echo "✅ 环境初始化完成"
     - name: Clone Source
       run: |
         git clone --depth 1 -b $REPO_BRANCH $REPO_URL openwrt
@@ -79,16 +62,17 @@ jobs:
         cd openwrt
         make defconfig
         make download -j8
+        find dl -size -1024c -exec rm -f {} \;
 
     - name: Compile
       run: |
         cd openwrt
-        make -j$(nproc) || make -j1
+        make -j$(nproc) || make -j1 || make -j1 V=s
 
     - name: Upload Release
       uses: ncipollo/release-action@v1
       with:
         tag: ZN-M2-${{ github.run_number }}
         name: ZN-M2 Firmware
-        artifacts: openwrt/bin/targets/**/*.*
+        artifacts: openwrt/bin/targets/**/*.bin,openwrt/bin/targets/**/*.img.gz,openwrt/bin/targets/**/*.manifest,openwrt/bin/targets/**/*.buildinfo
         token: ${{ secrets.GITHUB_TOKEN }}
