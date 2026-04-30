@@ -1,15 +1,14 @@
 #!/bin/bash
-cd openwrt
 
-# Passwall 官方源（必须用这个）
-echo "src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main" >> feeds.conf.default
-echo "src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main" >> feeds.conf.default
+cd openwrt || exit 1
 
-# MosDNS
-git clone --depth=1 https://github.com/sbwml/luci-app-mosdns package/mosdns
+cat >> feeds.conf.default <<'EOF'
+src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git
+src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git
+EOF
 
-# Lucky
-git clone --depth=1 https://github.com/gdy666/luci-app-lucky package/lucky
+mkdir -p package/custom
 
-# Gecoosac
-git clone --depth=1 https://github.com/laipeng668/luci-app-gecoosac package/gecoosac
+git clone --depth=1 https://github.com/sbwml/luci-app-mosdns package/custom/luci-app-mosdns
+git clone --depth=1 https://github.com/gdy666/luci-app-lucky package/custom/luci-app-lucky
+git clone --depth=1 https://github.com/laipeng668/luci-app-gecoosac package/custom/luci-app-gecoosac
