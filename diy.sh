@@ -1,7 +1,7 @@
 #!/bin/bash
 cd openwrt
 
-# Passwall
+# Passwall 官方源（必须用这个）
 echo "src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main" >> feeds.conf.default
 echo "src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main" >> feeds.conf.default
 
