@@ -63,26 +63,37 @@ jobs:
 
         make defconfig
 
-        # 强制关闭 WiFi / hostapd / wpad，修复 he_mu_edca 编译错误
-        ./scripts/config -d PACKAGE_wpad
-        ./scripts/config -d PACKAGE_wpad-basic
-        ./scripts/config -d PACKAGE_wpad-basic-mbedtls
-        ./scripts/config -d PACKAGE_wpad-basic-openssl
-        ./scripts/config -d PACKAGE_wpad-openssl
-        ./scripts/config -d PACKAGE_wpad-wolfssl
-        ./scripts/config -d PACKAGE_wpad-full
-        ./scripts/config -d PACKAGE_wpad-full-openssl
-        ./scripts/config -d PACKAGE_hostapd
-        ./scripts/config -d PACKAGE_hostapd-common
-        ./scripts/config -d PACKAGE_kmod-ath11k
-        ./scripts/config -d PACKAGE_kmod-ath11k-ahb
-        ./scripts/config -d PACKAGE_kmod-ath11k-pci
-        ./scripts/config -d PACKAGE_mac80211
-        ./scripts/config -d PACKAGE_cfg80211
-        ./scripts/config -d PACKAGE_iw
-        ./scripts/config -d PACKAGE_iwinfo
-        ./scripts/config -d PACKAGE_wireless-regdb
-        ./scripts/config -d PACKAGE_luci-app-wireless
+        # ===== 强制删除 WiFi 相关 =====
+        sed -i '/CONFIG_PACKAGE_.*wpad/d' .config
+        sed -i '/CONFIG_PACKAGE_.*hostapd/d' .config
+        sed -i '/CONFIG_PACKAGE_.*ath11k/d' .config
+        sed -i '/CONFIG_PACKAGE_.*mac80211/d' .config
+        sed -i '/CONFIG_PACKAGE_.*cfg80211/d' .config
+        sed -i '/CONFIG_PACKAGE_.*iw/d' .config
+        sed -i '/CONFIG_PACKAGE_.*wireless/d' .config
+
+        # ===== 强制写入禁用 =====
+        cat >> .config <<'EOF'
+# CONFIG_PACKAGE_wpad is not set
+# CONFIG_PACKAGE_wpad-basic is not set
+# CONFIG_PACKAGE_wpad-basic-mbedtls is not set
+# CONFIG_PACKAGE_wpad-basic-openssl is not set
+# CONFIG_PACKAGE_wpad-openssl is not set
+# CONFIG_PACKAGE_wpad-wolfssl is not set
+# CONFIG_PACKAGE_wpad-full is not set
+# CONFIG_PACKAGE_wpad-full-openssl is not set
+# CONFIG_PACKAGE_hostapd is not set
+# CONFIG_PACKAGE_hostapd-common is not set
+# CONFIG_PACKAGE_kmod-ath11k is not set
+# CONFIG_PACKAGE_kmod-ath11k-ahb is not set
+# CONFIG_PACKAGE_kmod-ath11k-pci is not set
+# CONFIG_PACKAGE_mac80211 is not set
+# CONFIG_PACKAGE_cfg80211 is not set
+# CONFIG_PACKAGE_iw is not set
+# CONFIG_PACKAGE_iwinfo is not set
+# CONFIG_PACKAGE_wireless-regdb is not set
+# CONFIG_PACKAGE_luci-app-wireless is not set
+EOF
 
         make defconfig
 
