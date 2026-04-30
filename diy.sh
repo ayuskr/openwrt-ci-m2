@@ -1,16 +1,16 @@
-
 #!/bin/bash
 
 cd openwrt
 
-# Passwall
-git clone https://github.com/xiaorouji/openwrt-passwall package/passwall
+# PassWall 官方新源
+echo "src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main" >> feeds.conf.default
+echo "src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main" >> feeds.conf.default
 
 # MosDNS
-git clone https://github.com/sbwml/luci-app-mosdns package/mosdns
+git clone --depth=1 https://github.com/sbwml/luci-app-mosdns package/luci-app-mosdns
 
 # Lucky
-git clone https://github.com/gdy666/luci-app-lucky package/lucky
+git clone --depth=1 https://github.com/gdy666/luci-app-lucky package/luci-app-lucky
 
-# Gecoosac
-git clone https://github.com/gecoosac/openwrt-gecoosac package/gecoosac
+# GecoosAC
+git clone --depth=1 https://github.com/laipeng668/luci-app-gecoosac package/luci-app-gecoosac
