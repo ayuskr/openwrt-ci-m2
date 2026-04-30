@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# 开启硬件加速
+uci set firewall.@defaults[0].flow_offloading='1'
+uci set firewall.@defaults[0].flow_offloading_hw='1'
+
+# 开启 IPv6
+uci set network.lan.ipv6='1'
+
+# DNS走本地（给 MosDNS）
+uci set network.lan.dns='127.0.0.1'
+
+uci commit
+/etc/init.d/firewall restart
