@@ -60,7 +60,35 @@ jobs:
     - name: Download
       run: |
         cd openwrt
+
         make defconfig
+
+        # 强制关闭 WiFi / hostapd / wpad，修复 he_mu_edca 编译错误
+        ./scripts/config -d PACKAGE_wpad
+        ./scripts/config -d PACKAGE_wpad-basic
+        ./scripts/config -d PACKAGE_wpad-basic-mbedtls
+        ./scripts/config -d PACKAGE_wpad-basic-openssl
+        ./scripts/config -d PACKAGE_wpad-openssl
+        ./scripts/config -d PACKAGE_wpad-wolfssl
+        ./scripts/config -d PACKAGE_wpad-full
+        ./scripts/config -d PACKAGE_wpad-full-openssl
+        ./scripts/config -d PACKAGE_hostapd
+        ./scripts/config -d PACKAGE_hostapd-common
+        ./scripts/config -d PACKAGE_kmod-ath11k
+        ./scripts/config -d PACKAGE_kmod-ath11k-ahb
+        ./scripts/config -d PACKAGE_kmod-ath11k-pci
+        ./scripts/config -d PACKAGE_mac80211
+        ./scripts/config -d PACKAGE_cfg80211
+        ./scripts/config -d PACKAGE_iw
+        ./scripts/config -d PACKAGE_iwinfo
+        ./scripts/config -d PACKAGE_wireless-regdb
+        ./scripts/config -d PACKAGE_luci-app-wireless
+
+        make defconfig
+
+        echo "==== 检查 WiFi 残留 ===="
+        grep -E "CONFIG_PACKAGE_(wpad|hostapd|ath11k|mac80211|cfg80211|iw|wireless)" .config || true
+
         make download -j8
         find dl -size -1024c -exec rm -f {} \;
 
