@@ -1,4 +1,4 @@
-name: ZN-M2 Build
+name: ZN-M2 Ultimate Build
 
 permissions:
   contents: write
@@ -12,7 +12,7 @@ env:
   REPO_BRANCH: main-nss
   CONFIG_FILE: configs/m2.config
   DIY_SCRIPT: diy.sh
-  FIRMWARE_TAG: ZN-M2
+  FIRMWARE_TAG: ZN-M2-Ultimate
   TZ: Asia/Shanghai
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Initialization Environment
+    - name: Init Environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
@@ -31,20 +31,17 @@ jobs:
         sudo -E apt -yqq update
         sudo -E apt -yqq install dos2unix libfuse-dev python3 python3-pip python3-setuptools python3-venv
         sudo -E apt -yqq autoremove --purge
-        sudo -E apt -yqq autoclean
         sudo -E apt -yqq clean
-        sudo -E systemctl daemon-reexec
-        sudo -E systemctl daemon-reload
         sudo timedatectl set-timezone "$TZ"
 
     - name: Clone Source
       run: |
         git clone --depth 1 -b $REPO_BRANCH $REPO_URL openwrt
-        echo "OPENWRT_PATH=$PWD/openwrt" >> $GITHUB_ENV
 
-    - name: Load Config
+    - name: Add Custom Feeds
       run: |
-        cp $CONFIG_FILE openwrt/.config
+        chmod +x $DIY_SCRIPT
+        bash $DIY_SCRIPT
 
     - name: Update Feeds
       run: |
@@ -52,32 +49,28 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
-    - name: DIY
+    - name: Load Config
       run: |
-        chmod +x $DIY_SCRIPT
-        bash $DIY_SCRIPT
+        cp $CONFIG_FILE openwrt/.config
+        [ -d files ] && cp -r files openwrt/files
+        cd openwrt
+        make defconfig
 
-    - name: Download
+    - name: Force Disable WiFi USB
       run: |
         cd openwrt
-
-        make defconfig
 
         sed -i '/CONFIG_PACKAGE_.*wpad/d' .config
         sed -i '/CONFIG_PACKAGE_.*hostapd/d' .config
         sed -i '/CONFIG_PACKAGE_.*ath11k/d' .config
         sed -i '/CONFIG_PACKAGE_.*mac80211/d' .config
         sed -i '/CONFIG_PACKAGE_.*cfg80211/d' .config
-        sed -i '/CONFIG_PACKAGE_.*iw/d' .config
         sed -i '/CONFIG_PACKAGE_.*wireless/d' .config
+        sed -i '/CONFIG_PACKAGE_.*usb/d' .config
 
         {
           echo "# CONFIG_PACKAGE_wpad is not set"
           echo "# CONFIG_PACKAGE_wpad-basic is not set"
-          echo "# CONFIG_PACKAGE_wpad-basic-mbedtls is not set"
-          echo "# CONFIG_PACKAGE_wpad-basic-openssl is not set"
-          echo "# CONFIG_PACKAGE_wpad-openssl is not set"
-          echo "# CONFIG_PACKAGE_wpad-wolfssl is not set"
           echo "# CONFIG_PACKAGE_wpad-full is not set"
           echo "# CONFIG_PACKAGE_wpad-full-openssl is not set"
           echo "# CONFIG_PACKAGE_hostapd is not set"
@@ -87,17 +80,23 @@ jobs:
           echo "# CONFIG_PACKAGE_kmod-ath11k-pci is not set"
           echo "# CONFIG_PACKAGE_mac80211 is not set"
           echo "# CONFIG_PACKAGE_cfg80211 is not set"
-          echo "# CONFIG_PACKAGE_iw is not set"
-          echo "# CONFIG_PACKAGE_iwinfo is not set"
-          echo "# CONFIG_PACKAGE_wireless-regdb is not set"
           echo "# CONFIG_PACKAGE_luci-app-wireless is not set"
+          echo "# CONFIG_PACKAGE_kmod-usb-core is not set"
+          echo "# CONFIG_PACKAGE_kmod-usb2 is not set"
+          echo "# CONFIG_PACKAGE_kmod-usb3 is not set"
         } >> .config
 
         make defconfig
 
-        echo "==== 检查 WiFi 残留 ===="
-        grep -E "CONFIG_PACKAGE_(wpad|hostapd|ath11k|mac80211|cfg80211|iw|wireless)" .config || true
+        echo "==== 检查插件 ===="
+        grep -E "CONFIG_PACKAGE_luci-app-(passwall|mosdns|lucky|gecoosac|adguardhome)" .config || true
 
+        echo "==== 检查目标 ===="
+        grep -E "CONFIG_TARGET_qualcommax|CONFIG_TARGET.*cmiot|CONFIG_TARGET.*zn" .config || true
+
+    - name: Download
+      run: |
+        cd openwrt
         make download -j8
         find dl -size -1024c -exec rm -f {} \;
 
@@ -106,10 +105,18 @@ jobs:
         cd openwrt
         make -j$(nproc) || make -j1 || make -j1 V=s
 
+    - name: Organize Firmware
+      run: |
+        cd openwrt/bin/targets/*/*
+        rm -rf packages
+        echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
+
     - name: Upload Release
       uses: ncipollo/release-action@v1
       with:
-        tag: ZN-M2-${{ github.run_number }}
-        name: ZN-M2 Firmware
-        artifacts: openwrt/bin/targets/**/*.bin,openwrt/bin/targets/**/*.img.gz,openwrt/bin/targets/**/*.manifest,openwrt/bin/targets/**/*.buildinfo
+        tag: ZN-M2-Ultimate-${{ github.run_number }}
+        name: ZN-M2 Ultimate Firmware
+        artifacts: ${{ env.FIRMWARE_PATH }}/*
+        allowUpdates: true
+        replacesArtifacts: true
         token: ${{ secrets.GITHUB_TOKEN }}
