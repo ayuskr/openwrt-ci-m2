@@ -8,6 +8,10 @@ uci set luci.main.lang='zh_cn'
 # 设置默认主题 Aurora
 uci set luci.main.mediaurlbase='/luci-static/aurora'
 
+# 修改默认 LAN 地址为 192.168.10.1
+uci set network.lan.ipaddr='192.168.10.1'
+uci set network.lan.netmask='255.255.255.0'
+
 # 开启流量分载
 uci set firewall.@defaults[0].flow_offloading='1'
 uci set firewall.@defaults[0].flow_offloading_hw='1'
@@ -20,6 +24,7 @@ uci commit luci
 uci commit firewall
 uci commit network
 
+/etc/init.d/network restart
 /etc/init.d/firewall restart
 
 exit 0
