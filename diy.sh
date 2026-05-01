@@ -1,5 +1,5 @@
 #!/bin/bash
-cd openwrt
+cd openwrt || exit 1
 
 echo "src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git" >> feeds.conf.default
 echo "src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git" >> feeds.conf.default
