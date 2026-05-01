@@ -49,39 +49,71 @@ jobs:
         cd openwrt
         make defconfig
 
-    - name: Kill WiFi（最终稳定版）
+    - name: Kill WiFi
       run: |
         cd openwrt
 
         make defconfig
 
-        # 删除 WiFi 相关
+        # 删除 WiFi 相关配置
         sed -i '/wpad/d;/hostapd/d;/supplicant/d;/ath11k/d;/mac80211/d;/cfg80211/d;/wifi/d;/wireless/d' .config
 
-        # 删除默认依赖
+        # 删除设备默认 WiFi 依赖
         sed -i '/CONFIG_DEFAULT_.*wpad/d;/CONFIG_DEFAULT_.*hostapd/d;/CONFIG_DEFAULT_.*wifi/d' .config
 
-        # 强制禁用
+        # 强制禁用 WiFi 核心包
         echo "# CONFIG_PACKAGE_wpad is not set" >> .config
+        echo "# CONFIG_PACKAGE_wpad-basic is not set" >> .config
+        echo "# CONFIG_PACKAGE_wpad-basic-mbedtls is not set" >> .config
+        echo "# CONFIG_PACKAGE_wpad-basic-openssl is not set" >> .config
+        echo "# CONFIG_PACKAGE_wpad-basic-wolfssl is not set" >> .config
+        echo "# CONFIG_PACKAGE_wpad-mbedtls is not set" >> .config
+        echo "# CONFIG_PACKAGE_wpad-mesh-mbedtls is not set" >> .config
+        echo "# CONFIG_PACKAGE_wpad-mesh-openssl is not set" >> .config
+        echo "# CONFIG_PACKAGE_wpad-mesh-wolfssl is not set" >> .config
+        echo "# CONFIG_PACKAGE_wpad-mini is not set" >> .config
         echo "# CONFIG_PACKAGE_wpad-openssl is not set" >> .config
+        echo "# CONFIG_PACKAGE_wpad-wolfssl is not set" >> .config
+        echo "# CONFIG_PACKAGE_wpad-full is not set" >> .config
         echo "# CONFIG_PACKAGE_wpad-full-openssl is not set" >> .config
         echo "# CONFIG_PACKAGE_hostapd is not set" >> .config
+        echo "# CONFIG_PACKAGE_hostapd-common is not set" >> .config
+        echo "# CONFIG_PACKAGE_hostapd-mini is not set" >> .config
+        echo "# CONFIG_PACKAGE_hostapd-openssl is not set" >> .config
+        echo "# CONFIG_PACKAGE_hostapd-wolfssl is not set" >> .config
+        echo "# CONFIG_PACKAGE_supplicant is not set" >> .config
+        echo "# CONFIG_PACKAGE_supplicant-full is not set" >> .config
         echo "# CONFIG_PACKAGE_supplicant-full-internal is not set" >> .config
+        echo "# CONFIG_PACKAGE_kmod-ath11k is not set" >> .config
+        echo "# CONFIG_PACKAGE_kmod-ath11k-ahb is not set" >> .config
+        echo "# CONFIG_PACKAGE_kmod-ath11k-pci is not set" >> .config
         echo "# CONFIG_PACKAGE_kmod-mac80211 is not set" >> .config
+        echo "# CONFIG_PACKAGE_mac80211 is not set" >> .config
+        echo "# CONFIG_PACKAGE_kmod-cfg80211 is not set" >> .config
+        echo "# CONFIG_PACKAGE_cfg80211 is not set" >> .config
         echo "# CONFIG_PACKAGE_wifi-scripts is not set" >> .config
+        echo "# CONFIG_PACKAGE_wireless-regdb is not set" >> .config
+        echo "# CONFIG_PACKAGE_luci-app-wireless is not set" >> .config
 
+        # 强制禁用默认 WiFi 包
         echo "# CONFIG_DEFAULT_wpad is not set" >> .config
         echo "# CONFIG_DEFAULT_wpad-openssl is not set" >> .config
+        echo "# CONFIG_DEFAULT_wpad-full-openssl is not set" >> .config
         echo "# CONFIG_DEFAULT_hostapd is not set" >> .config
+        echo "# CONFIG_DEFAULT_hostapd-common is not set" >> .config
+        echo "# CONFIG_DEFAULT_hostapd-openssl is not set" >> .config
+        echo "# CONFIG_DEFAULT_supplicant is not set" >> .config
+        echo "# CONFIG_DEFAULT_supplicant-full-internal is not set" >> .config
+        echo "# CONFIG_DEFAULT_kmod-mac80211 is not set" >> .config
         echo "# CONFIG_DEFAULT_wifi-scripts is not set" >> .config
+        echo "# CONFIG_DEFAULT_luci-app-wireless is not set" >> .config
 
         make defconfig
 
-        echo "==== 检查关键WiFi组件 ===="
-        grep -E "CONFIG_PACKAGE_(wpad|hostapd|supplicant|mac80211|wifi-scripts)" .config || true
+        echo "==== 检查真正启用的 WiFi 核心组件 ===="
+        grep -E "^CONFIG_PACKAGE_(wpad|wpad-openssl|wpad-full-openssl|hostapd|hostapd-openssl|supplicant|kmod-mac80211|wifi-scripts)=y" .config || true
 
-        # 只检测真正会炸的包
-        if grep -qE "CONFIG_PACKAGE_(wpad|hostapd|supplicant|kmod-mac80211|wifi-scripts)=y" .config; then
+        if grep -qE "^CONFIG_PACKAGE_(wpad|wpad-openssl|wpad-full-openssl|hostapd|hostapd-openssl|supplicant|kmod-mac80211|wifi-scripts)=y" .config; then
           echo "ERROR: WiFi core packages still enabled"
           exit 1
         fi
