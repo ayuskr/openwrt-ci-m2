@@ -146,6 +146,10 @@ jobs:
         grep -E "^CONFIG_PACKAGE_luci-app-(passwall|mosdns|lucky|gecoosac)=y" .config || true
         grep -E "^CONFIG_PACKAGE_(xray-core|mosdns|lucky)=y" .config || true
 
+        echo "==== 检查中文语言包 ===="
+        grep -E "^CONFIG_PACKAGE_luci-i18n-(base|firewall|opkg)-zh-cn=y" .config || true
+        grep -E "^CONFIG_PACKAGE_luci-theme-aurora=y" .config || true
+
     - name: Download
       run: |
         cd openwrt
