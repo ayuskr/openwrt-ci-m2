@@ -1,14 +1,15 @@
 #!/bin/sh
 
+# 主机名
 uci set system.@system[0].hostname='ZN-M2'
 
-# 设置中文界面
+# 默认中文语言
 uci set luci.main.lang='zh_cn'
 
-# 设置默认主题 Aurora
+# 默认 Aurora 主题
 uci set luci.main.mediaurlbase='/luci-static/aurora'
 
-# 修改默认 LAN 地址为 192.168.10.1
+# 默认 LAN 地址
 uci set network.lan.ipaddr='192.168.10.1'
 uci set network.lan.netmask='255.255.255.0'
 
@@ -21,9 +22,15 @@ uci set network.lan.ipv6='1'
 
 uci commit system
 uci commit luci
-uci commit firewall
 uci commit network
+uci commit firewall
 
+# 清理 LuCI 缓存，避免语言/主题不刷新
+rm -rf /tmp/luci-*
+rm -rf /tmp/luci-indexcache
+rm -rf /tmp/luci-modulecache
+
+/etc/init.d/uhttpd restart
 /etc/init.d/network restart
 /etc/init.d/firewall restart
 
