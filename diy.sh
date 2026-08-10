@@ -3,24 +3,20 @@ set -e
 
 cd openwrt || exit 1
 
-# Daed 需要 clang 编译 eBPF 相关组件
+# Daed 需要 clang 编译 eBPF 相关组件。
+# CONFIG_LLVM_HOST_PATH="/usr" 会使用 /usr/bin/clang。
 sudo apt-get update
 sudo apt-get install -y clang llvm lld
 
-mkdir -p staging_dir/host/bin
-ln -sf "$(command -v clang)" staging_dir/host/bin/clang
-ln -sf "$(command -v llvm-config)" staging_dir/host/bin/llvm-config
-ln -sf "$(command -v llvm-strip)" staging_dir/host/bin/llvm-strip
-
-# 清理不再使用或曾经添加错误的 feed
+# 移除不再使用的 PassWall、dae 和错误的 daed feed。
 sed -i '/passwall_packages/d' feeds.conf.default
 sed -i '/passwall_luci/d' feeds.conf.default
-sed -i '/^src-git daed /d' feeds.conf.default
 sed -i '/^src-git dae /d' feeds.conf.default
+sed -i '/^src-git daed /d' feeds.conf.default
 
 mkdir -p package/custom
 
-# 清理旧插件目录，避免 Actions 缓存或重复源码影响构建
+# 清理旧的第三方源码，避免重复目录或缓存残留。
 rm -rf package/custom/luci-app-mosdns
 rm -rf package/custom/luci-app-lucky
 rm -rf package/custom/luci-app-gecoosac
@@ -43,22 +39,25 @@ git clone --depth=1 \
   https://github.com/laipeng668/luci-app-gecoosac \
   package/custom/luci-app-gecoosac
 
-# Aurora 主题
+# Aurora theme
 git clone --depth=1 \
   https://github.com/eamonxg/luci-theme-aurora \
   package/custom/luci-theme-aurora
 
-# Daed LuCI 插件、Daed 主程序及 GeoIP / GeoSite 数据
+# Daed LuCI plugin, daemon, GeoIP and GeoSite packages
 git clone --depth=1 \
   https://github.com/QiuSimons/luci-app-daed \
   package/custom/luci-app-daed
 
-# 在 feeds 更新前验证 Daed 源码已正确下载
+# Fail early when the Daed source was not downloaded correctly.
 test -d package/custom/luci-app-daed
 test -n "$(find package/custom/luci-app-daed -name Makefile -type f -print -quit)"
 
-# 输出 Daed 包定义，便于 Actions 日志确认实际可用包
+# Print the actual Daed package definitions into the Actions log.
 grep -R \
   --include='Makefile' \
   -E 'define Package/(luci-app-daed|daed|daed-geoip|daed-geosite)' \
-  package/custom/luci-app-daed
+  package/custom/luci-app-daed || true
+
+# Confirm the compiler that will be used by bpf-headers.
+clang --version
