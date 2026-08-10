@@ -3,15 +3,24 @@ set -e
 
 cd openwrt || exit 1
 
-mkdir -p package/custom
+# Daed 需要 clang 编译 eBPF 相关组件
+sudo apt-get update
+sudo apt-get install -y clang llvm lld
 
-# 清理旧的 PassWall 和 Daed feed 配置
+mkdir -p staging_dir/host/bin
+ln -sf "$(command -v clang)" staging_dir/host/bin/clang
+ln -sf "$(command -v llvm-config)" staging_dir/host/bin/llvm-config
+ln -sf "$(command -v llvm-strip)" staging_dir/host/bin/llvm-strip
+
+# 清理不再使用或曾经添加错误的 feed
 sed -i '/passwall_packages/d' feeds.conf.default
 sed -i '/passwall_luci/d' feeds.conf.default
 sed -i '/^src-git daed /d' feeds.conf.default
 sed -i '/^src-git dae /d' feeds.conf.default
 
-# 清理旧的插件源码
+mkdir -p package/custom
+
+# 清理旧插件目录，避免 Actions 缓存或重复源码影响构建
 rm -rf package/custom/luci-app-mosdns
 rm -rf package/custom/luci-app-lucky
 rm -rf package/custom/luci-app-gecoosac
@@ -39,14 +48,17 @@ git clone --depth=1 \
   https://github.com/eamonxg/luci-theme-aurora \
   package/custom/luci-theme-aurora
 
-# Daed LuCI 插件及相关程序
+# Daed LuCI 插件、Daed 主程序及 GeoIP / GeoSite 数据
 git clone --depth=1 \
   https://github.com/QiuSimons/luci-app-daed \
   package/custom/luci-app-daed
 
-# 检查 Daed 源码是否成功下载
+# 在 feeds 更新前验证 Daed 源码已正确下载
 test -d package/custom/luci-app-daed
 test -n "$(find package/custom/luci-app-daed -name Makefile -type f -print -quit)"
 
-# 输出 Daed 源码中实际存在的 Makefile
-find package/custom/luci-app-daed -name Makefile -type f -print
+# 输出 Daed 包定义，便于 Actions 日志确认实际可用包
+grep -R \
+  --include='Makefile' \
+  -E 'define Package/(luci-app-daed|daed|daed-geoip|daed-geosite)' \
+  package/custom/luci-app-daed
