@@ -3,6 +3,19 @@
 set -euo pipefail
 
 # =========================================================
+# Configuration
+# =========================================================
+
+readonly MOSDNS_REPO="https://github.com/sbwml/luci-app-mosdns.git"
+readonly LUCKY_REPO="https://github.com/gdy666/luci-app-lucky.git"
+readonly GECOOSAC_REPO="https://github.com/laipeng668/luci-app-gecoosac.git"
+readonly AURORA_REPO="https://github.com/eamonxg/luci-theme-aurora.git"
+readonly DAED_REPO="https://github.com/QiuSimons/luci-app-daed.git"
+
+# This daed revision produces an empty wing/webrender/web directory.
+readonly BROKEN_DAED_REVISION="671e65d2fdcd62fe6a3ec18ecda209c5addea898"
+
+# =========================================================
 # Locate OpenWrt source directory
 # =========================================================
 
@@ -23,11 +36,12 @@ echo "${OPENWRT_DIR}"
 # Install host dependencies
 # =========================================================
 
-echo "===== Installing build dependencies ====="
+echo "===== Installing host dependencies ====="
 
 sudo apt-get update
 
 sudo apt-get install -y \
+    build-essential \
     clang \
     llvm \
     lld \
@@ -39,36 +53,33 @@ sudo apt-get install -y \
     curl \
     wget \
     xz-utils \
-    unzip
+    unzip \
+    rsync \
+    file
 
 # =========================================================
-# Validate host LLVM tools
+# Validate LLVM/BPF tools
 # =========================================================
 
-echo "===== Validating host LLVM tools ====="
+echo "===== Validating LLVM tools ====="
+
+for tool in clang llvm-config llvm-strip; do
+    if ! command -v "${tool}" >/dev/null 2>&1; then
+        echo "ERROR: Required tool was not found: ${tool}" >&2
+        exit 1
+    fi
+
+    echo "${tool}: $(command -v "${tool}")"
+done
 
 if [ ! -x /usr/bin/clang ]; then
-    echo "ERROR: /usr/bin/clang was not found." >&2
+    echo "ERROR: CONFIG_BPF_TOOLCHAIN_HOST_PATH=/usr requires /usr/bin/clang." >&2
     exit 1
 fi
-
-if ! command -v llvm-strip >/dev/null 2>&1; then
-    echo "ERROR: llvm-strip was not found." >&2
-    exit 1
-fi
-
-if ! command -v llvm-config >/dev/null 2>&1; then
-    echo "ERROR: llvm-config was not found." >&2
-    exit 1
-fi
-
-echo "clang: $(command -v clang)"
-echo "llvm-strip: $(command -v llvm-strip)"
-echo "llvm-config: $(command -v llvm-config)"
 
 /usr/bin/clang --version
-llvm-strip --version
 llvm-config --version
+llvm-strip --version
 
 # =========================================================
 # Remove obsolete feed definitions
@@ -94,7 +105,6 @@ clean_feed_file() {
 clean_feed_file "feeds.conf.default"
 clean_feed_file "feeds.conf"
 
-# Remove old feed directories and package links.
 rm -rf \
     feeds/dae \
     feeds/daed \
@@ -105,7 +115,7 @@ rm -rf \
 # Prepare custom package directory
 # =========================================================
 
-echo "===== Preparing custom package directory ====="
+echo "===== Preparing custom packages ====="
 
 mkdir -p package/custom
 
@@ -118,61 +128,85 @@ rm -rf \
     package/custom/luci-app-daed
 
 # =========================================================
-# Clone MosDNS
+# Clone custom packages
 # =========================================================
 
 echo "===== Cloning MosDNS ====="
 
 git clone \
     --depth=1 \
-    https://github.com/sbwml/luci-app-mosdns.git \
+    "${MOSDNS_REPO}" \
     package/custom/luci-app-mosdns
-
-# =========================================================
-# Clone Lucky
-# =========================================================
 
 echo "===== Cloning Lucky ====="
 
 git clone \
     --depth=1 \
-    https://github.com/gdy666/luci-app-lucky.git \
+    "${LUCKY_REPO}" \
     package/custom/luci-app-lucky
-
-# =========================================================
-# Clone GecoosAC
-# =========================================================
 
 echo "===== Cloning GecoosAC ====="
 
 git clone \
     --depth=1 \
-    https://github.com/laipeng668/luci-app-gecoosac.git \
+    "${GECOOSAC_REPO}" \
     package/custom/luci-app-gecoosac
-
-# =========================================================
-# Clone Aurora theme
-# =========================================================
 
 echo "===== Cloning Aurora theme ====="
 
 git clone \
     --depth=1 \
-    https://github.com/eamonxg/luci-theme-aurora.git \
+    "${AURORA_REPO}" \
     package/custom/luci-theme-aurora
 
-# =========================================================
-# Clone Daed
-# =========================================================
-
-echo "===== Cloning Daed ====="
+# A complete history is required to locate the revision before the broken
+# daed source update.
+echo "===== Cloning Daed package repository ====="
 
 git clone \
-    --depth=1 \
-    --recurse-submodules \
-    --shallow-submodules \
-    https://github.com/QiuSimons/luci-app-daed.git \
+    "${DAED_REPO}" \
     package/custom/luci-app-daed
+
+# =========================================================
+# Pin luci-app-daed before the broken daed source update
+# =========================================================
+
+echo "===== Locating broken Daed package update ====="
+
+BROKEN_PACKAGE_COMMIT="$(
+    git -C package/custom/luci-app-daed \
+        log \
+        --all \
+        --format='%H' \
+        -S"${BROKEN_DAED_REVISION}" \
+        -- daed/Makefile |
+        head -n 1
+)"
+
+if [ -z "${BROKEN_PACKAGE_COMMIT}" ]; then
+    echo "ERROR: Could not find the luci-app-daed commit that introduced:" >&2
+    echo "ERROR: ${BROKEN_DAED_REVISION}" >&2
+    exit 1
+fi
+
+if ! git -C package/custom/luci-app-daed \
+    rev-parse "${BROKEN_PACKAGE_COMMIT}^" >/dev/null 2>&1; then
+    echo "ERROR: The commit before ${BROKEN_PACKAGE_COMMIT} is unavailable." >&2
+    exit 1
+fi
+
+DAED_PACKAGE_REVISION="$(
+    git -C package/custom/luci-app-daed \
+        rev-parse "${BROKEN_PACKAGE_COMMIT}^"
+)"
+
+echo "Broken package commit: ${BROKEN_PACKAGE_COMMIT}"
+echo "Selected package commit: ${DAED_PACKAGE_REVISION}"
+
+git -C package/custom/luci-app-daed \
+    checkout \
+    --detach \
+    "${DAED_PACKAGE_REVISION}"
 
 git -C package/custom/luci-app-daed \
     submodule update \
@@ -180,7 +214,29 @@ git -C package/custom/luci-app-daed \
     --recursive
 
 # =========================================================
-# Validate custom package sources
+# Confirm the broken source revision is no longer selected
+# =========================================================
+
+echo "===== Checking selected Daed source definition ====="
+
+if grep -R -F -q \
+    "${BROKEN_DAED_REVISION}" \
+    package/custom/luci-app-daed/daed \
+    --include='Makefile'; then
+    echo "ERROR: The selected package still uses the broken Daed revision:" >&2
+    echo "ERROR: ${BROKEN_DAED_REVISION}" >&2
+    exit 1
+fi
+
+# Extract the selected upstream source information for the log.
+grep -R -nE \
+    'PKG_NAME|PKG_VERSION|PKG_RELEASE|PKG_SOURCE_VERSION|PKG_SOURCE_URL|PKG_MIRROR_HASH' \
+    package/custom/luci-app-daed/daed \
+    --include='Makefile' \
+    || true
+
+# =========================================================
+# Validate package sources
 # =========================================================
 
 validate_package_source() {
@@ -227,43 +283,50 @@ validate_package_source \
     "Daed" \
     "package/custom/luci-app-daed"
 
-# =========================================================
-# Ensure dae was not added accidentally
-# =========================================================
-
-echo "===== Checking for incorrect dae package ====="
+if [ ! -f package/custom/luci-app-daed/daed/Makefile ]; then
+    echo "ERROR: Daed package Makefile is missing." >&2
+    exit 1
+fi
 
 if [ -d package/custom/luci-app-dae ]; then
     echo "ERROR: luci-app-dae is present, but luci-app-daed is required." >&2
     exit 1
 fi
 
-if [ ! -d package/custom/luci-app-daed ]; then
-    echo "ERROR: luci-app-daed is missing." >&2
-    exit 1
-fi
-
-echo "OK: luci-app-daed is present"
-echo "OK: luci-app-dae is absent"
-
 # =========================================================
-# Daed source diagnostics
+# Remove stale Daed downloads and build products
 # =========================================================
 
-echo "===== Daed source revision ====="
+echo "===== Removing stale Daed build data ====="
+
+# The old archive uses PKG_MIRROR_HASH=skip, so OpenWrt may reuse it.
+# Delete it to force downloading the source selected by the pinned Makefile.
+rm -f dl/daed-*.tar.gz
+
+rm -rf \
+    build_dir/target-*/daed-* \
+    tmp/.daed-*.flock
+
+find staging_dir \
+    -type f \
+    \( -name '*daed*' -o -name '.daed*' \) \
+    -delete \
+    2>/dev/null \
+    || true
+
+# =========================================================
+# Diagnostics
+# =========================================================
+
+echo "===== Selected luci-app-daed revision ====="
 
 git -C package/custom/luci-app-daed rev-parse HEAD
 git -C package/custom/luci-app-daed log -1 --oneline
 
-echo "===== Daed repository status ====="
-
-git -C package/custom/luci-app-daed status --short
-git -C package/custom/luci-app-daed submodule status --recursive || true
-
-echo "===== Daed package source definition ====="
+echo "===== Selected Daed source definition ====="
 
 grep -R -nE \
-    'PKG_NAME|PKG_VERSION|PKG_RELEASE|PKG_SOURCE|PKG_SOURCE_VERSION|PKG_SOURCE_URL|PKG_MIRROR_HASH|daeuniverse/daed|dae-wing' \
+    'PKG_NAME|PKG_VERSION|PKG_RELEASE|PKG_SOURCE|PKG_SOURCE_VERSION|PKG_SOURCE_URL|PKG_MIRROR_HASH' \
     package/custom/luci-app-daed/daed \
     --include='Makefile' \
     || true
@@ -276,14 +339,6 @@ grep -R -nE \
     --include='Makefile' \
     || true
 
-echo "===== Daed Makefiles ====="
-
-find package/custom/luci-app-daed \
-    -type f \
-    -name Makefile \
-    -print \
-    | sort
-
 echo "===== Daed patches ====="
 
 find package/custom/luci-app-daed/daed \
@@ -292,31 +347,6 @@ find package/custom/luci-app-daed/daed \
     -print \
     | sort \
     || true
-
-echo "===== Daed submodule declarations ====="
-
-find package/custom/luci-app-daed \
-    -type f \
-    -name '.gitmodules' \
-    -print \
-    -exec sed -n '1,240p' {} \; \
-    || true
-
-echo "===== Daed web-related build definitions ====="
-
-grep -R -nE \
-    'webrender|go generate|go:embed|npm|pnpm|yarn|web/' \
-    package/custom/luci-app-daed \
-    --include='Makefile' \
-    --include='*.patch' \
-    --include='*.diff' \
-    --include='*.go' \
-    --include='package.json' \
-    || true
-
-# =========================================================
-# Display custom package summary
-# =========================================================
 
 echo "===== Custom packages ====="
 
