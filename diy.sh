@@ -1,14 +1,13 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 cd openwrt || exit 1
 
-# Daed 需要 clang 编译 eBPF 相关组件。
-# CONFIG_LLVM_HOST_PATH="/usr" 会使用 /usr/bin/clang。
+# dae 的 eBPF 组件需要 clang、LLVM 和 lld。
 sudo apt-get update
 sudo apt-get install -y clang llvm lld
 
-# 移除不再使用的 PassWall、dae 和错误的 daed feed。
+# 清除旧的 PassWall、dae 和 daed feed 配置。
 sed -i '/passwall_packages/d' feeds.conf.default
 sed -i '/passwall_luci/d' feeds.conf.default
 sed -i '/^src-git dae /d' feeds.conf.default
@@ -16,7 +15,7 @@ sed -i '/^src-git daed /d' feeds.conf.default
 
 mkdir -p package/custom
 
-# 清理旧的第三方源码，避免重复目录或缓存残留。
+# 清除可能由缓存或旧脚本留下的第三方源码。
 rm -rf package/custom/luci-app-mosdns
 rm -rf package/custom/luci-app-lucky
 rm -rf package/custom/luci-app-gecoosac
@@ -44,20 +43,27 @@ git clone --depth=1 \
   https://github.com/eamonxg/luci-theme-aurora \
   package/custom/luci-theme-aurora
 
-# Daed LuCI plugin, daemon, GeoIP and GeoSite packages
+# dae LuCI application
 git clone --depth=1 \
-  https://github.com/QiuSimons/luci-app-daed \
-  package/custom/luci-app-daed
+  https://github.com/QiuSimons/luci-app-dae \
+  package/custom/luci-app-dae
 
-# Fail early when the Daed source was not downloaded correctly.
-test -d package/custom/luci-app-daed
-test -n "$(find package/custom/luci-app-daed -name Makefile -type f -print -quit)"
+# 检查第三方源码是否完整。
+test -n "$(find package/custom/luci-app-mosdns -name Makefile -type f -print -quit)"
+test -n "$(find package/custom/luci-app-lucky -name Makefile -type f -print -quit)"
+test -n "$(find package/custom/luci-app-gecoosac -name Makefile -type f -print -quit)"
+test -n "$(find package/custom/luci-theme-aurora -name Makefile -type f -print -quit)"
+test -n "$(find package/custom/luci-app-dae -name Makefile -type f -print -quit)"
 
-# Print the actual Daed package definitions into the Actions log.
+# 检查 BPF 编译器。配置中的路径为 /usr，因此实际程序必须存在于 /usr/bin。
+test -x /usr/bin/clang
+test -x /usr/bin/llvm-config
+
+echo "===== Host clang ====="
+/usr/bin/clang --version
+
+echo "===== dae package definitions ====="
 grep -R \
   --include='Makefile' \
-  -E 'define Package/(luci-app-daed|daed|daed-geoip|daed-geosite)' \
-  package/custom/luci-app-daed || true
-
-# Confirm the compiler that will be used by bpf-headers.
-clang --version
+  -nE 'luci-app-dae|Package/dae|v2ray-geoip|v2ray-geosite' \
+  package/custom/luci-app-dae || true
